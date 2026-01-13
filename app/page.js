@@ -158,7 +158,7 @@ export default function Home() {
           </div>
           <input
             className="w-full h-14 bg-white border border-gray-200 rounded-xl pl-12 pr-4 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-sm text-lg"
-            placeholder="搜索电影、电视剧、演员..."
+            placeholder="搜索电影、电视剧..."
             type="text"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}

@@ -43,12 +43,12 @@ export function ContinueWatching({ playHistory }) {
         {playHistory.slice(0, 6).map((record) => (
           <div
             key={`${record.source}-${record.id}`}
-            className="group relative flex-shrink-0 w-[280px] bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer"
+            className="group relative shrink-0 w-[280px] bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer"
             onClick={() => handlePlayClick(record)}
           >
             <div className="flex gap-4 p-4">
               {/* 海报 */}
-              <div className="relative w-24 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <div className="relative w-24 h-36 bg-gray-100 rounded-lg overflow-hidden shrink-0">
                 <img
                   src={record.poster}
                   alt={record.title}

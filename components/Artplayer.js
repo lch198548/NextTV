@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import Artplayer from "artplayer";
 import Hls from "hls.js";
+import artplayerPluginDanmuku from "artplayer-plugin-danmuku";
 
 // 去广告功能：过滤 M3U8 中的广告片段
 function filterAdsFromM3U8(m3u8Content) {
@@ -71,9 +72,13 @@ export const Player = ({
   getInstance,
   className,
   style,
+  danmaku = [], // 弹幕数据
+  onDanmakuLoad, // 弹幕加载完成回调
 }) => {
   const artRef = useRef(null);
   const playerRef = useRef(null);
+  const danmakuPluginRef = useRef(null); // 弹幕插件实例引用
+  const hasLoadedFirstDanmaku = useRef(false); // 追踪是否已经首次加载弹幕
 
   // 使用 ref 保存状态，避免重新渲染
   const getInitialBlockAdEnabled = () => {
@@ -187,6 +192,9 @@ export const Player = ({
   useEffect(() => {
     if (!artRef.current) return;
 
+    // 重置弹幕加载标志（每次播放器重新创建时）
+    hasLoadedFirstDanmaku.current = false;
+
     const art = new Artplayer({
       volume: 0.7,
       isLive: false,
@@ -218,6 +226,31 @@ export const Player = ({
       },
       ...option,
       container: artRef.current,
+
+      // 插件配置
+      plugins: [
+        // 弹幕插件
+        artplayerPluginDanmuku({
+          danmuku: danmaku,
+          speed: 5, // 弹幕速度，数字越小速度越快
+          opacity: 1, // 弹幕透明度
+          fontSize: 25, // 弹幕字体大小
+          emitter: false, // 是否启用弹幕发射器
+          color: "#FFFFFF", // 默认弹幕颜色
+          mode: 0, // 弹幕模式：0-滚动，1-顶部，2-底部
+          margin: [10, "25%"], // 弹幕上下边距
+          antiOverlap: true, // 是否防重叠
+          useWorker: true, // 是否使用 web worker
+          synchronousPlayback: false, // 是否同步到播放速度
+          filter: (danmu) => danmu.text.length <= 50, // 过滤过长弹幕
+          lockTime: 5, // 弹幕锁定时间
+          maxLength: 100, // 最大弹幕长度
+          minWidth: 200, // 最小弹幕宽度
+          maxWidth: 400, // 最大弹幕宽度
+          theme: "dark", // 弹幕主题
+        }),
+        ...(option.plugins || []),
+      ],
 
       // HLS 支持配置
       customType: {
@@ -334,6 +367,16 @@ export const Player = ({
 
     playerRef.current = art;
 
+    // 保存弹幕插件实例
+    if (art.plugins && art.plugins.artplayerPluginDanmuku) {
+      danmakuPluginRef.current = art.plugins.artplayerPluginDanmuku;
+
+      // 通知父组件弹幕已加载
+      if (onDanmakuLoad && typeof onDanmakuLoad === "function") {
+        onDanmakuLoad(danmakuPluginRef.current);
+      }
+    }
+
     // 监听视频时间更新事件，实现跳过片头片尾
     art.on("video:timeupdate", () => {
       if (!skipConfigRef.current.enable) return;
@@ -393,6 +436,49 @@ export const Player = ({
     handleSetOutro,
     handleClearSkipConfig,
   ]);
+
+  // 监听弹幕数据变化，动态更新弹幕
+  useEffect(() => {
+    if (!danmakuPluginRef.current || !playerRef.current) return;
+
+    // 如果弹幕为空，跳过（避免不必要的更新）
+    if (danmaku.length === 0) {
+      // 如果之前已经加载过弹幕，现在变成空了（切换到无弹幕的剧集），需要清空
+      if (hasLoadedFirstDanmaku.current) {
+        console.log("清空弹幕");
+        if (typeof danmakuPluginRef.current.load === "function") {
+          danmakuPluginRef.current.reset();
+        }
+      }
+      return;
+    }
+
+    // 检查弹幕插件是否有 load 方法
+    if (typeof danmakuPluginRef.current.load === "function") {
+      // 标记首次加载
+      if (!hasLoadedFirstDanmaku.current) {
+        console.log("首次加载弹幕，共", danmaku.length, "条");
+        hasLoadedFirstDanmaku.current = true;
+      } else {
+        console.log("重新加载弹幕，共", danmaku.length, "条");
+      }
+
+      // 使用 config + load 更新弹幕数据
+      // 注意：load() 方法只会更新弹幕数据，不会影响视频播放状态
+      danmakuPluginRef.current.reset();
+      danmakuPluginRef.current.config({
+        danmuku: danmaku,
+      });
+      danmakuPluginRef.current.load();
+
+      // 显示通知
+      if (playerRef.current && playerRef.current.notice) {
+        playerRef.current.notice.show = `已加载 ${danmaku.length} 条弹幕`;
+      }
+    } else {
+      console.warn("弹幕插件不支持 load 方法，无法动态更新弹幕");
+    }
+  }, [danmaku]); // 只监听弹幕数据变化
 
   return <div ref={artRef} className={className} style={style}></div>;
 };

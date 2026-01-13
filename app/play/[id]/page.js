@@ -4,9 +4,13 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Player } from "../../../components/Artplayer";
+import { FavoriteButton } from "../../../components/FavoriteButton";
+import { EpisodeList } from "../../../components/EpisodeList";
 import { getVideoDetail } from "../../../lib/api";
 import { useSettingsStore } from "../../../store/useSettingsStore";
 import { usePlayHistoryStore } from "../../../store/usePlayHistoryStore";
+import { fetchDanmakuFromSources } from "../../../lib/danmakuApi";
+import { extractEpisodeNumberFromTitle } from "../../../lib/util";
 
 export default function PlayerPage() {
   const params = useParams();
@@ -18,14 +22,22 @@ export default function PlayerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
-  const [episodesCollapsed, setEpisodesCollapsed] = useState(false);
+  const [danmaku, setDanmaku] = useState([]); // 弹幕数据
 
   // 播放器引用
   const playerRef = useRef(null);
 
+  // 稳定的 getInstance 回调，避免因为引用变化导致播放器重新创建
+  const handleGetInstance = useCallback((art) => {
+    playerRef.current = art;
+  }, []);
+
   // 播放记录store
   const addPlayRecord = usePlayHistoryStore((state) => state.addPlayRecord);
   const getPlayRecord = usePlayHistoryStore((state) => state.getPlayRecord);
+
+  // 获取弹幕源配置
+  const danmakuSources = useSettingsStore((state) => state.danmakuSources);
 
   // 保存播放进度的间隔引用
   const saveIntervalRef = useRef(null);
@@ -67,6 +79,68 @@ export default function PlayerPage() {
     // 只在 id 或 source 改变时重新获取数据，不依赖 videoSources
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, source]);
+
+  // 获取弹幕数据
+  useEffect(() => {
+    async function loadDanmaku() {
+      // 检查是否有视频详情和豆瓣ID
+      if (!videoDetail || !videoDetail.douban_id) {
+        console.log('没有豆瓣ID，无法获取弹幕');
+        setDanmaku([]);
+        return;
+      }
+
+      // 检查是否有启用的弹幕源
+      const enabledSources = danmakuSources.filter(s => s.enabled);
+      if (enabledSources.length === 0) {
+        console.log('没有启用的弹幕源');
+        setDanmaku([]);
+        return;
+      }
+
+      try {
+        // 判断是否是电影（只有1集）
+        const isMovie = videoDetail.episodes?.length === 1;
+
+        // 获取当前剧集标题
+        const currentEpisodeTitle =
+          videoDetail.episodes_titles?.[currentEpisodeIndex] ||
+          `第${currentEpisodeIndex + 1}集`;
+
+        // 从标题中提取集数
+        let episodeNumber = extractEpisodeNumberFromTitle(
+          currentEpisodeTitle,
+          isMovie
+        );
+
+        // 如果提取失败，回退到使用索引
+        if (episodeNumber === null) {
+          episodeNumber = currentEpisodeIndex + 1;
+          console.warn(
+            `无法从标题 "${currentEpisodeTitle}" 中提取集数，使用索引 ${episodeNumber}`
+          );
+        }
+
+        console.log(
+          `获取弹幕: 豆瓣ID=${videoDetail.douban_id}, 标题="${currentEpisodeTitle}", 集数=${episodeNumber}${isMovie ? ' (电影)' : ''}`
+        );
+
+        const danmakuData = await fetchDanmakuFromSources(
+          danmakuSources,
+          videoDetail.douban_id,
+          episodeNumber
+        );
+
+        setDanmaku(danmakuData);
+        console.log(`弹幕加载完成，共 ${danmakuData.length} 条`);
+      } catch (error) {
+        console.error('获取弹幕失败:', error);
+        setDanmaku([]);
+      }
+    }
+
+    loadDanmaku();
+  }, [videoDetail, currentEpisodeIndex, danmakuSources]);
 
   // 切换剧集
   const handleEpisodeClick = (index) => {
@@ -378,9 +452,8 @@ export default function PlayerPage() {
                   height: "100%",
                 }}
                 className="w-full h-full"
-                getInstance={(art) => {
-                  playerRef.current = art;
-                }}
+                danmaku={danmaku}
+                getInstance={handleGetInstance}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white">
@@ -417,11 +490,11 @@ export default function PlayerPage() {
                         / 10
                       </span>
                     </div>
-                    <button className="flex items-center justify-center h-10 w-10 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors">
-                      <span className="material-symbols-outlined">
-                        favorite
-                      </span>
-                    </button>
+                    <FavoriteButton
+                      source={source}
+                      id={id}
+                      videoDetail={videoDetail}
+                    />
                     <button className="flex items-center justify-center h-10 w-10 rounded-full hover:bg-gray-100 text-gray-400 hover:text-blue-500 transition-colors">
                       <span className="material-symbols-outlined">share</span>
                     </button>
@@ -485,78 +558,12 @@ export default function PlayerPage() {
 
         {/* Right Column: Episodes */}
         <div className={`space-y-6 transition-all duration-300 lg:col-span-4`}>
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden sticky top-28">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <h3 className="font-bold text-gray-900 text-lg">选集</h3>
-              <button className="text-xs text-gray-500 hover:text-primary flex items-center gap-1 transition-colors">
-                {videoDetail.episodes.length > 1
-                  ? `共 ${videoDetail.episodes.length} 集`
-                  : "电影"}
-                <span className="material-symbols-outlined text-sm">info</span>
-              </button>
-            </div>
-            {videoDetail.episodes.length > 1 && (
-              <>
-                <div
-                  className="px-4 py-3 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => setEpisodesCollapsed(!episodesCollapsed)}
-                >
-                  <span className="text-sm font-semibold text-gray-700">
-                    第 1 - {videoDetail.episodes.length} 集
-                  </span>
-                  <span
-                    className={`material-symbols-outlined text-gray-400 text-lg transition-transform ${
-                      episodesCollapsed ? "" : "rotate-180"
-                    }`}
-                  >
-                    expand_less
-                  </span>
-                </div>
-                {!episodesCollapsed && (
-                  <div className="p-4 pt-6 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 gap-2.5 max-h-[500px] overflow-y-auto custom-scrollbar">
-                    {videoDetail.episodes.map((_, index) => {
-                      const episodeTitle =
-                        videoDetail.episodes_titles[index] ||
-                        `第${index + 1}集`;
-                      const displayIndex = String(index + 1).padStart(2, "0");
-                      return (
-                        <div key={index} className="relative group/episode">
-                          <button
-                            className={`w-full aspect-square flex items-center justify-center rounded-lg font-medium border transition-all relative text-xs cursor-pointer
-                              ${
-                                index === currentEpisodeIndex
-                                  ? "bg-primary text-white font-semibold shadow-md ring-2 ring-primary/20 border-transparent"
-                                  : "bg-gray-50 text-gray-700 border-gray-200 hover:border-primary hover:text-primary hover:bg-white"
-                              }
-                            `}
-                            onClick={() => handleEpisodeClick(index)}
-                          >
-                            {displayIndex}
-                            {index === currentEpisodeIndex && (
-                              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
-                              </span>
-                            )}
-                          </button>
-                          {/* Hover Tooltip */}
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/episode:opacity-100 group-hover/episode:visible transition-all duration-200 pointer-events-none z-50">
-                            {episodeTitle}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-gray-900"></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-            {videoDetail.episodes.length === 1 && (
-              <div className="p-4 text-center text-gray-500">
-                这是一部电影，无需选集
-              </div>
-            )}
-          </div>
+          <EpisodeList
+            episodes={videoDetail.episodes}
+            episodesTitles={videoDetail.episodes_titles}
+            currentEpisodeIndex={currentEpisodeIndex}
+            onEpisodeClick={handleEpisodeClick}
+          />
         </div>
       </div>
     </div>
