@@ -114,7 +114,7 @@ export function Navbar() {
           onClick={() => router.push("/")}
         >
           <div className="flex items-center">
-            <Image src="/logo.png" alt="NextTV" width={24} height={24} />
+            <Image src="https://tncache1-f1.v3mh.com/image/2026/01/14/67727e3ade57c7062ef81a16d4f711a0.png" alt="NextTV" width={24} height={24} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight leading-none flex items-center">
             <span className="text-gray-900">Next</span>

@@ -14,6 +14,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "tncache1-f1.v3mh.com",
+      },
+      {
+        protocol: "https",
         hostname: "lh3.googleusercontent.com",
       },
     ],
