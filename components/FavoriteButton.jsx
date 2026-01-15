@@ -1,47 +1,51 @@
 "use client";
 
-import { useCallback } from "react";
+import { useState } from "react";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
 
 export function FavoriteButton({ source, id, videoDetail }) {
-  const isFavorited = useFavoritesStore((state) => state.isFavorited);
+  // 使用精确选择器：只选择当前item的收藏状态，避免不必要的重渲染
+  const favoriteStateFromStore = useFavoritesStore((state) => state.favorites.some((fav) => fav.source === source && fav.id === id));
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
 
-  // 直接从 store 派生收藏状态，无需本地 state 和 useEffect
-  const favoriteState =
-    videoDetail && id && source ? isFavorited(source, id) : false;
+  // 本地乐观状态：用于立即响应用户点击
+  const [isOptimistic, setIsOptimistic] = useState(null);
 
-  // 处理收藏
-  const handleToggleFavorite = useCallback(() => {
+  // 使用本地乐观状态（如果有）或store状态
+  const favoriteState = isOptimistic !== null ? isOptimistic : favoriteStateFromStore;
+
+  // 处理收藏：使用乐观更新
+  const handleToggleFavorite = () => {
     if (!videoDetail || !id || !source) return;
 
-    toggleFavorite({
-      source,
-      id,
-      title: videoDetail.title,
-      type: videoDetail.episodes?.length > 1 ? "tv" : "movie",
-      genre: videoDetail.genre || "",
-      poster: videoDetail.poster,
-    });
-  }, [videoDetail, id, source, toggleFavorite]);
+    // 1. 立即更新UI（乐观更新）
+    const newState = !favoriteState;
+    setIsOptimistic(newState);
+
+    // 2. 异步更新store（这会触发localStorage写入）
+    setTimeout(() => {
+      toggleFavorite({
+        source,
+        id,
+        title: videoDetail.title,
+        type: videoDetail.episodes?.length > 1 ? "tv" : "movie",
+        genre: videoDetail.genre || "",
+        poster: videoDetail.poster,
+      });
+      // 清除本地乐观状态，回到store状态
+      setIsOptimistic(null);
+    }, 0);
+  };
 
   return (
     <button
       onClick={handleToggleFavorite}
       className={`flex items-center justify-center h-10 w-10 rounded-full hover:bg-gray-100 transition-colors ${
-        favoriteState
-          ? "text-red-500 hover:text-red-600"
-          : "text-gray-400 hover:text-red-500"
+        favoriteState ? "text-red-500 hover:text-red-600" : "text-gray-400 hover:text-red-500"
       }`}
       title={favoriteState ? "取消收藏" : "添加收藏"}
     >
-      <span
-        className={`material-symbols-outlined ${
-          favoriteState ? "material-symbols-filled" : ""
-        }`}
-      >
-        favorite
-      </span>
+      <span className={`material-symbols-outlined ${favoriteState ? "material-symbols-filled" : ""}`}>favorite</span>
     </button>
   );
 }

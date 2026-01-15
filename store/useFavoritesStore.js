@@ -13,12 +13,9 @@ export const useFavoritesStore = create(
       addFavorite: (item) => set((state) => {
         const { source, id, title, type, genre, poster } = item;
 
-        // 生成唯一key
-        const key = `${source}-${id}`;
-
-        // 检查是否已收藏
+        // 检查是否已收藏（使用some优化性能）
         const exists = state.favorites.some(
-          (fav) => `${fav.source}-${fav.id}` === key
+          (fav) => fav.source === source && fav.id === id
         );
 
         if (exists) {
@@ -48,26 +45,38 @@ export const useFavoritesStore = create(
         ),
       })),
 
-      // 检查是否已收藏
-      isFavorited: (source, id) => {
-        const state = get();
-        return state.favorites.some(
-          (fav) => fav.source === source && fav.id === id
-        );
-      },
-
-      // 切换收藏状态
+      // 切换收藏状态（优化版：减少查询次数）
       toggleFavorite: (item) => {
         const state = get();
-        const isFav = state.isFavorited(item.source, item.id);
+        const { source, id } = item;
 
-        if (isFav) {
-          state.removeFavorite(item.source, item.id);
+        // 在一次遍历中查找是否存在
+        const existingIndex = state.favorites.findIndex(
+          (fav) => fav.source === source && fav.id === id
+        );
+
+        if (existingIndex !== -1) {
+          // 已收藏，删除
+          set((state) => ({
+            favorites: state.favorites.filter((_, idx) => idx !== existingIndex)
+          }));
+          return false;
         } else {
-          state.addFavorite(item);
+          // 未收藏，添加
+          const newFavorite = {
+            source,
+            id,
+            title: item.title,
+            type: item.type,
+            genre: item.genre,
+            poster: item.poster,
+            addedAt: Date.now(),
+          };
+          set((state) => ({
+            favorites: [newFavorite, ...state.favorites]
+          }));
+          return true;
         }
-
-        return !isFav; // 返回新状态
       },
 
       // 清空所有收藏
