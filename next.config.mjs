@@ -2,10 +2,7 @@
 const nextConfig = {
   reactStrictMode: false,
   reactCompiler: true,
-  env: {
-    API_KEY: process.env.API_KEY,
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  },
+  output: "standalone",
   images: {
     remotePatterns: [
       {
