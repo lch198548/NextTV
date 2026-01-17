@@ -89,7 +89,7 @@ export default function PlayerPage() {
       console.error("保存播放进度失败:", err);
     }
   };
-  // 切换到指定集数（普通函数，可以在任何地方调用）
+  // Toggling to designated episode (normal function, can be called anywhere)
   const switchToEpisode = async (newIndex) => {
     if (!videoDetail || !artPlayerRef.current) return;
 
@@ -97,40 +97,40 @@ export default function PlayerPage() {
     const newTitle = videoDetail.episodes_titles?.[newIndex] || `第 ${newIndex + 1} 集`;
 
     if (!newUrl) {
-      console.error("无效的集数索引:", newIndex);
+      console.error("Invalid episode index:", newIndex);
       return;
     }
 
-    console.log("切换到集数:", newIndex + 1);
+    console.log("Switching to episode:", newIndex + 1);
 
-    // 1. 保存当前进度
+    // 1. Save current progress
     savePlayProgress();
 
-    // 2. 更新集数索引
+    // 2. Update episode index
     setCurrentEpisodeIndex(newIndex);
 
-    // 3. 检查 store 中是否有该集的播放记录
+    // 3. Check if there is a play record for this episode in store
     const playRecord = getPlayRecord(source, id);
     let resumeTime = 0;
     if (playRecord && playRecord.currentEpisodeIndex === newIndex) {
       resumeTime = playRecord.currentTime > 5 ? playRecord.currentTime : 0;
-      console.log(`找到第${newIndex + 1}集的播放记录，将恢复到 ${Math.floor(resumeTime)} 秒`);
+      console.log(`Found play record for episode ${newIndex + 1}, resuming to ${Math.floor(resumeTime)} seconds`);
     }
 
-    // 4. 切换播放器 URL
+    // 4. Switch player URL
     artPlayerRef.current.switch = newUrl;
     artPlayerRef.current.title = `${videoDetail.title} - ${newTitle}`;
     artPlayerRef.current.poster = videoDetail?.backdrop || videoDetail?.poster || "";
-    // 4.1 清空弹幕
+    // 4.1 Clear danmaku
     artPlayerRef.current.plugins.artplayerPluginDanmuku.reset();
     artPlayerRef.current.plugins.artplayerPluginDanmuku.config({
       danmuku: [],
     });
     artPlayerRef.current.plugins.artplayerPluginDanmuku.load();
-    console.log("清空弹幕");
-    // 5. 恢复播放进度（如果有）
+    console.log("Cleared danmaku");
+    // 5. Resume playback progress (if any)
     if (resumeTime > 0) {
-      // 使用 once 监听，确保只执行一次
+      // Use once listener to ensure it only executes once
       artPlayerRef.current.once("video:canplay", () => {
         try {
           const duration = artPlayerRef.current.duration || 0;
@@ -139,15 +139,15 @@ export default function PlayerPage() {
             target = Math.max(0, duration - 5);
           }
           artPlayerRef.current.currentTime = target;
-          artPlayerRef.current.notice.show = `已恢复到 ${Math.floor(target / 60)}:${String(Math.floor(target % 60)).padStart(2, "0")}`;
-          console.log("成功恢复播放进度到:", target);
+          artPlayerRef.current.notice.show = `Resumed to ${Math.floor(target / 60)}:${String(Math.floor(target % 60)).padStart(2, "0")}`;
+          console.log("Successfully resumed playback progress to:", target);
         } catch (err) {
-          console.warn("恢复播放进度失败:", err);
+          console.warn("Failed to resume playback progress:", err);
         }
       });
     }
 
-    // 6. 尝试将弹幕的异步函数切换过去
+    // 6. Try to switch the async danmaku function
     const isMovie = videoDetail.episodes?.length === 1;
     artPlayerRef.current.plugins.artplayerPluginDanmuku.config({
       danmuku: createDanmakuLoader(danmakuSources, videoDetail.douban_id, newTitle, newIndex, isMovie),
@@ -155,13 +155,13 @@ export default function PlayerPage() {
     artPlayerRef.current.plugins.artplayerPluginDanmuku.load();
   };
   // -------------------------------------------------------------------------
-  // useEffectEvent 创建只能在 useEffect 中调用的稳定函数
+  // useEffectEvent creates a stable function that can only be called within useEffect
   // -------------------------------------------------------------------------
-  // 保存播放进度 - 只在 useEffect 中调用
+  // Save play progress - only called in useEffect
   const savePlayProgressEvent = useEffectEvent(savePlayProgress);
 
-  // 定期保存进度 - 只在 useEffect 的 timeupdate 中调用
-  // 先本地更新进度，再保存到store
+  // Periodic progress saving - only called in useEffect's timeupdate
+  // Update local progress first, then save to store
   const handleTimeupdateSaveEvent = useEffectEvent(() => {
     const now = Date.now();
     if (now - lastSaveTimeRef.current > 5000) {
@@ -169,7 +169,7 @@ export default function PlayerPage() {
       lastSaveTimeRef.current = now;
     }
   });
-  // 处理跳过片头片尾逻辑
+  // Handle intro/outro skipping logic
   const handleSkipEvent = useEffectEvent(() => {
     if (!skipConfig.enable || !artPlayerRef.current) return;
 
@@ -177,19 +177,19 @@ export default function PlayerPage() {
     const duration = artPlayerRef.current.duration || 0;
     const now = Date.now();
 
-    // 限制检查频率
+    // Limit check frequency
     if (now - lastSkipCheckRef.current < 1500) return;
     lastSkipCheckRef.current = now;
-    // 跳过片头
+    // Skip intro
     if (skipConfig.intro_time > 0 && currentTime < skipConfig.intro_time) {
       artPlayerRef.current.currentTime = skipConfig.intro_time;
-      artPlayerRef.current.notice.show = `已跳过片头 (${formatTime(skipConfig.intro_time)})`;
+      artPlayerRef.current.notice.show = `Skipped intro (${formatTime(skipConfig.intro_time)})`;
     }
 
-    // 跳过片尾
+    // Skip outro
     if (skipConfig.outro_time < 0 && duration > 0 && currentTime > duration + skipConfig.outro_time) {
-      artPlayerRef.current.notice.show = `已跳过片尾 (${formatTime(-skipConfig.outro_time)})`;
-      // 触发下一集或暂停
+      artPlayerRef.current.notice.show = `Skipped outro (${formatTime(-skipConfig.outro_time)})`;
+      // Trigger next episode or pause
       if (videoDetail && videoDetail.episodes && currentEpisodeIndex < videoDetail.episodes.length - 1) {
         switchToEpisode(currentEpisodeIndex + 1);
       } else {
@@ -198,11 +198,11 @@ export default function PlayerPage() {
     }
   });
 
-  // 键盘快捷键处理
+  // Keyboard shortcut handler
   const handleKeyboardShortcutsEvent = useEffectEvent((e) => {
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
 
-    // Alt + 左箭头 = 上一集
+    // Alt + Left Arrow = Previous Episode
     if (e.altKey && e.key === "ArrowLeft") {
       if (currentEpisodeIndex > 0) {
         switchToEpisode(currentEpisodeIndex - 1);
@@ -210,7 +210,7 @@ export default function PlayerPage() {
       }
     }
 
-    // Alt + 右箭头 = 下一集
+    // Alt + Right Arrow = Next Episode
     if (e.altKey && e.key === "ArrowRight") {
       if (videoDetail && videoDetail.episodes && currentEpisodeIndex < videoDetail.episodes.length - 1) {
         switchToEpisode(currentEpisodeIndex + 1);
@@ -218,7 +218,7 @@ export default function PlayerPage() {
       }
     }
 
-    // 左箭头 = 快退
+    // Left Arrow = Rewind
     if (!e.altKey && e.key === "ArrowLeft") {
       if (artPlayerRef.current && artPlayerRef.current.currentTime > 5) {
         artPlayerRef.current.currentTime -= 10;
@@ -226,7 +226,7 @@ export default function PlayerPage() {
       }
     }
 
-    // 右箭头 = 快进
+    // Right Arrow = Fast Forward
     if (!e.altKey && e.key === "ArrowRight") {
       if (artPlayerRef.current && artPlayerRef.current.currentTime < artPlayerRef.current.duration - 5) {
         artPlayerRef.current.currentTime += 10;
@@ -234,25 +234,25 @@ export default function PlayerPage() {
       }
     }
 
-    // 上箭头 = 音量+
+    // Up Arrow = Volume Up
     if (e.key === "ArrowUp") {
       if (artPlayerRef.current && artPlayerRef.current.volume < 1) {
         artPlayerRef.current.volume = Math.round((artPlayerRef.current.volume + 0.1) * 10) / 10;
-        artPlayerRef.current.notice.show = `音量: ${Math.round(artPlayerRef.current.volume * 100)}`;
+        artPlayerRef.current.notice.show = `Volume: ${Math.round(artPlayerRef.current.volume * 100)}`;
         e.preventDefault();
       }
     }
 
-    // 下箭头 = 音量-
+    // Down Arrow = Volume Down
     if (e.key === "ArrowDown") {
       if (artPlayerRef.current && artPlayerRef.current.volume > 0) {
         artPlayerRef.current.volume = Math.round((artPlayerRef.current.volume - 0.1) * 10) / 10;
-        artPlayerRef.current.notice.show = `音量: ${Math.round(artPlayerRef.current.volume * 100)}`;
+        artPlayerRef.current.notice.show = `Volume: ${Math.round(artPlayerRef.current.volume * 100)}`;
         e.preventDefault();
       }
     }
 
-    // 空格 = 播放/暂停
+    // Space = Play/Pause
     if (e.key === " ") {
       if (artPlayerRef.current) {
         artPlayerRef.current.toggle();
@@ -260,7 +260,7 @@ export default function PlayerPage() {
       }
     }
 
-    // f 键 = 切换全屏
+    // f Key = Toggle Fullscreen
     if (e.key === "f" || e.key === "F") {
       if (artPlayerRef.current) {
         artPlayerRef.current.fullscreen = !artPlayerRef.current.fullscreen;
@@ -282,7 +282,7 @@ export default function PlayerPage() {
       }, 1000);
     }
   });
-  // 自定义 HLS Loader（去广告）
+  // Custom HLS Loader (Ad blocking)
   class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
     constructor(config) {
       super(config);
@@ -302,7 +302,7 @@ export default function PlayerPage() {
     }
   }
   // -------------------------------------------------------------------------
-  // 加载数据
+  // Load data
   // -------------------------------------------------------------------------
   useEffect(() => {
     blockAdEnabledRef.current = blockAdEnabled;
@@ -311,7 +311,7 @@ export default function PlayerPage() {
   useEffect(() => {
     async function loadData() {
       if (!id || !source) {
-        setError("缺少必要的参数");
+        setError("Missing necessary parameters");
         setLoading(false);
         return;
       }
@@ -319,7 +319,7 @@ export default function PlayerPage() {
       const videoSources = useSettingsStore.getState().videoSources;
       const sourceConfig = videoSources.find((s) => s.key === source);
       if (!sourceConfig) {
-        setError("未找到对应的视频源");
+        setError("Video source not found");
         setLoading(false);
         return;
       }
@@ -329,33 +329,37 @@ export default function PlayerPage() {
 
       try {
         const videoDetailData = await getVideoDetail(id, sourceConfig.name, sourceConfig.url);
-        setVideoDetail(videoDetailData);
-        // 2. 读取播放记录，确定初始集数
+        
+        // 2. Read play record, determine initial episode
         const playHistory = usePlayHistoryStore.getState().playHistory;
         const playRecord = playHistory.find((item) => item.source === source && item.id === id);
+        
         initialEpisodeIndex.current = playRecord?.currentEpisodeIndex ?? 0;
-        setCurrentEpisodeIndex(() => initialEpisodeIndex.current);
         initialTime.current = playRecord?.currentTime && playRecord.currentTime > 5 ? playRecord.currentTime : 0;
-        if (!videoDetailData.douban_id) {
-          console.log("没有豆瓣ID，无法获取弹幕");
-          return;
-        }
-        const doubanResult = await scrapeDoubanDetails(videoDetailData.douban_id);
-        if (doubanResult.code === 200 && doubanResult.data.actors) {
-          const doubanActorData = doubanResult.data.actors.map((actor) => {
-            return {
+        
+        let actorsData = [];
+        if (videoDetailData.douban_id) {
+          const doubanResult = await scrapeDoubanDetails(videoDetailData.douban_id);
+          if (doubanResult.code === 200 && doubanResult.data.actors) {
+            actorsData = doubanResult.data.actors.map((actor) => ({
               ...actor,
               avatar: actor.avatar.replace(/img\d+\.doubanio\.com/g, "img.doubanio.cmliussss.com"),
-            };
-          });
-          setDoubanActors(doubanActorData);
+            }));
+          } else {
+            console.warn("Failed to fetch Douban actor data:", doubanResult.reason?.message);
+          }
         } else {
-          console.warn("获取豆瓣演员数据失败:", doubanResult.reason?.message);
-          setDoubanActors([]);
+             console.log("No Douban ID, cannot get danmaku");
         }
+        
+        // Batch updates to avoid multiple re-renders
+        setVideoDetail(videoDetailData);
+        setCurrentEpisodeIndex(initialEpisodeIndex.current);
+        setDoubanActors(actorsData);
+        
       } catch (err) {
-        console.error("加载数据失败:", err);
-        setError("加载数据失败");
+        console.error("Failed to load data:", err);
+        setError("Failed to load data");
       } finally {
         setLoading(false);
       }

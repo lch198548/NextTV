@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { SpeedTestBadge } from "@/components/SpeedTestBadge";
 
 export function MovieCard({ movie }) {
   const router = useRouter();
@@ -64,6 +65,13 @@ export function MovieCard({ movie }) {
               🔗 豆瓣
             </a>
           </div>
+        )}
+        {movie.source && movie.source_url && (
+            <SpeedTestBadge 
+                videoId={movie.id} 
+                sourceKey={movie.source} 
+                sourceUrl={movie.source_url} 
+            />
         )}
       </div>
       <div>
