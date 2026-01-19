@@ -66,6 +66,7 @@ export default function PlayerPage() {
             videoDetail={videoDetail}
             loading={loading}
             currentEpisodeIndex={currentEpisodeIndex}
+            setCurrentEpisodeIndex={setCurrentEpisodeIndex}
             initialEpisodeIndex={initialEpisodeIndex}
             initialTime={initialTime}
             blockAdEnabledRef={blockAdEnabledRef}

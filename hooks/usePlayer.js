@@ -17,6 +17,7 @@ export function usePlayer({
   skipConfigRef,
   id,
   source,
+  setCurrentEpisodeIndex,
 }) {
   const artRef = useRef(null);
   const artPlayerRef = useRef(null);
@@ -128,8 +129,11 @@ export function usePlayer({
       artPlayerRef.current.plugins.artplayerPluginDanmuku.load();
 
       playingEpisodeIndexRef.current = newIndex;
+      if (setCurrentEpisodeIndex) {
+        setCurrentEpisodeIndex(newIndex);
+      }
     },
-    [videoDetail, id, source, savePlayProgress],
+    [videoDetail, id, source, savePlayProgress, setCurrentEpisodeIndex],
   );
 
   useEffect(() => {
