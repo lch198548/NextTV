@@ -2,7 +2,6 @@ import {useEffect, useRef, useEffectEvent} from "react";
 import Artplayer from "artplayer";
 import Hls from "hls.js";
 import artplayerPluginDanmuku from "artplayer-plugin-danmuku";
-import artplayerPluginLiquidGlass from "@/lib/artplayer-plugin-liquid-glass";
 import {useSettingsStore} from "@/store/useSettingsStore";
 import {usePlayHistoryStore} from "@/store/usePlayHistoryStore";
 import {formatTime, CustomHlsJsLoader} from "@/lib/util";
@@ -211,7 +210,6 @@ export function usePlayer({
         moreVideoAttr: {
           crossOrigin: "anonymous",
         },
-
         plugins: [
           artplayerPluginDanmuku({
             danmuku: danmakuLoader,
@@ -232,7 +230,6 @@ export function usePlayer({
             maxWidth: 400,
             theme: "dark",
           }),
-          artplayerPluginLiquidGlass(),
         ],
 
         customType: {
