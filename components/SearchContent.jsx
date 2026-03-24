@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { MovieCard } from "@/components/MovieCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -31,6 +31,10 @@ export default function SearchContent() {
 
   // 只显示已激活的源
   const enabledSources = videoSources.filter((s) => s.enabled);
+  // 稳定的依赖值，避免 Zustand hydration 引用变化触发重复请求
+  const enabledSourceKeys = enabledSources.map((s) => s.key).join(",");
+  const videoSourcesRef = useRef(videoSources);
+  videoSourcesRef.current = videoSources;
   // 从 URL 参数读取源过滤，默认为第一个激活源
   const sourceParam = searchParams.get("source");
   const sourceFilter = sourceParam && enabledSources.some((s) => s.key === sourceParam)
@@ -74,7 +78,7 @@ export default function SearchContent() {
       setError(null);
 
       try {
-        const searchData = await searchVideos(query, videoSources, currentPage);
+        const searchData = await searchVideos(query, videoSourcesRef.current, currentPage);
         setResults(searchData.results);
         setPageCount(searchData.pageCount);
 
@@ -92,7 +96,7 @@ export default function SearchContent() {
     }
 
     performSearch();
-  }, [query, videoSources, currentPage]);
+  }, [query, enabledSourceKeys, currentPage]);
 
   // 根据媒体类型和视频源过滤结果
   const filteredResults = results.filter((result) => {
